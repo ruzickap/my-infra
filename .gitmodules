@@ -1,0 +1,3 @@
+[submodule "web-page/themes/bootstrap-bp-hugo-startpage"]
+	path = web-page/themes/bootstrap-bp-hugo-startpage
+	url = https://github.com/spech66/bootstrap-bp-hugo-startpage.git
