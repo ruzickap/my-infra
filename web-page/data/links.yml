@@ -1,0 +1,12 @@
+---
+- group: Web pages
+  items:
+    - title: Grafana<br>(grafana.infra.xvx.cz)
+      url: https://grafana.infra.xvx.cz
+      icon: fas fa-poll
+    - title: Prometheus<br>(prometheus.infra.xvx.cz)
+      url: https://prometheus.infra.xvx.cz
+      icon: fas fa-poll-h
+    - title: Alertmanager<br>(alertmanager.infra.xvx.cz)
+      url: https://alertmanager.infra.xvx.cz
+      icon: fas fa-bullhorn

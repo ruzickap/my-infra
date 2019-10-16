@@ -1,0 +1,15 @@
+baseURL = "https://infra.xvx.cz"
+languageCode = "en-US"
+title = "infra.xvx.cz"
+theme = "bootstrap-bp-hugo-startpage"
+copyright = "Petr Ruzicka"
+enableRobotsTXT = true
+pygmentsCodeFences = true
+canonifyurls = true
+
+[params]
+  description = "infra.xvx.cz"
+  #images = ["logo.jpg"]
+  startPageColumns = false
+  welcomeText = "infra.xvx.cz"
+  showGoogleSearch = false
