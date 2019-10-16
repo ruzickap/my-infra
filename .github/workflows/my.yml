@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    paths:
+    - 'web-page/**'
+    - '.github/**'
+
+jobs:
+  build-deploy:
+    name: "Build & Deploy"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+        with:
+          submodules: true
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v2.2.2
+        with:
+          hugo-version: 'latest'
+
+      - name: Build
+        working-directory: ./web-page
+        run: hugo --gc
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v2.5.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_BRANCH: gh-pages
+          PUBLISH_DIR: ./web-page/public
