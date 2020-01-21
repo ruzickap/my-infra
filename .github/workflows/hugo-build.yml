@@ -1,17 +1,17 @@
-name: Build
+name: hugo-build
 
 on:
   pull_request:
     types: [opened, synchronize]
     paths:
       - web-page/**
-      - .github/workflows/my.yml
+      - .github/workflows/hugo-build.yml.yml
   push:
     branches:
       - master
     paths:
-    - web-page/**
-    - .github/workflows/my.yml
+      - web-page/**
+      - .github/workflows/hugo-build.yml.yml
 
 jobs:
   build-deploy:
@@ -27,20 +27,19 @@ jobs:
           git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
 
       - name: Setup Hugo
-        uses: peaceiris/actions-hugo@v2.3.2
+        uses: peaceiris/actions-hugo@v2
         with:
-          hugo-version: '0.62.0'
+          hugo-version: 'latest'
 
       - name: Build
         working-directory: ./web-page
         run: hugo --gc
 
       - name: Deploy
-        uses: peaceiris/actions-gh-pages@v2.8.0
+        uses: peaceiris/actions-gh-pages@v2
         env:
           ACTIONS_DEPLOY_KEY: ${{ secrets.ACTIONS_DEPLOY_KEY }}
           PUBLISH_BRANCH: gh-pages
           PUBLISH_DIR: ./web-page/public
         with:
-          emptyCommits: false
           forceOrphan: true
