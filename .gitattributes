@@ -1,0 +1,5 @@
+# Files that are going to be encrypted
+ansible/vars/secrets.yml filter=git-crypt diff=git-crypt
+
+# Making sure that .gitattributes is never encrypted. DON'T TOUCH THAT LINE AND ONE BELOW
+.git* !filter !diff
