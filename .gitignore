@@ -1,2 +1,8 @@
-public
-resources
+# Generated files by Hugo
+public/
+resources/_gen/
+
+# Terraform files
+.terraform
+*.tfstate*
+crash.log
