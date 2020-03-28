@@ -1,0 +1,24 @@
+- name: Create redirect_hosts.txt for Caddy and Google Auth
+  copy:
+    dest: /etc/caddy/redirect_hosts.txt
+    content: |
+      {% for web_service in web_services %}
+      {{ web_service.service }}.{{ my_name }}.{{ domain }}
+      {% endfor %}
+
+- name: Create directory for web pages
+  file:
+    path: /var/www/html
+    state: directory
+    owner: www-data
+    mode: 0755
+
+- name: Clone web pages to /var/www/html
+  git:
+    repo: 'https://github.com/ruzickap/my-infra.git'
+    dest: /var/www/html
+    version: gh-pages
+    force: yes
+    umask: '022'
+  changed_when: false
+  become_user: www-data

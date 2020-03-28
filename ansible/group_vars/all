@@ -1,0 +1,8 @@
+default_username: ubuntu
+web_services:
+  - service: grafana
+    port: 3000
+  - service: prometheus
+    port: 9090
+  - service: alertmanager
+    port: 9093

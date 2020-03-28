@@ -1,0 +1,35 @@
+- name: Change infrastructure using Terraform (this may take a long time...)
+  terraform:
+    force_init: true
+    project_path: terraform/{{ lookup('env','CLOUD_PLATFORM') }}
+    backend_config:
+      bucket: "terraform-state"
+      key: "terraform.tfstate"
+      region: "{{ lookup('env','TF_VAR_region') }}"
+      endpoint: "{{ lookup('env','S3_BACKEND_CONFIG_ENDPOINT') }}"
+  register: terraform_apply_output
+
+- name: Terrafrom apply output
+  debug:
+    var: terraform_apply_output.stdout_lines
+
+- name: Add hosts
+  add_host:
+    name: "{{ item.0 }}"
+    ansible_host: "{{ item.1 }}"
+    groups:
+      - infra
+  changed_when: false
+  loop: "{{ terraform_apply_output.outputs.infra_instances.value | zip( terraform_apply_output.outputs.infra_instance_public_ips.value ) | list }}"
+
+- name: Show details
+  debug:
+    msg: "{{ item }}"
+  loop: "{{ terraform_apply_output.outputs.infra_instances.value | zip( terraform_apply_output.outputs.infra_instance_public_ips.value ) | list }}"
+
+- name: Wait for all VMs to boot
+  wait_for:
+    host: "{{ hostvars[item].ansible_host }}"
+    port: 22
+    search_regex: OpenSSH
+  loop: "{{ groups['infra'] }}"

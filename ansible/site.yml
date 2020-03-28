@@ -1,0 +1,178 @@
+---
+########################################################################
+# Build Cloud infrastructure
+########################################################################
+- name: Define the infrastructure
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  tasks:
+    - import_tasks: tasks/terraform_{{ lookup('env','ACTION') }}.yml
+
+
+########################################################################
+# Configure all Virtual Machines
+########################################################################
+- name: Configure VMs created by Terraform
+  hosts: infra
+  user: "{{ default_username }}"
+  become: true
+
+  vars_files:
+    - vars/secrets.yml
+
+  pre_tasks:
+    - name: Set variables from env
+      set_fact:
+        email: "{{ lookup('env','CLOUDFLARE_EMAIL') }}"
+        cloudflare_api_key: "{{ lookup('env','CLOUDFLARE_API_KEY') }}"
+        domain: "{{ lookup('env','MY_DOMAIN') }}"
+        letsencrypt_environment: "{{ lookup('env','LETSENCRYPT_ENVIRONMENT') }}"
+        my_name: "{{ lookup('env','MY_NAME') }}"
+
+  roles:
+    - role: ajsalminen.hosts
+
+    - role: my_common_defaults
+
+    - role: oefenweb.postfix
+      postfix_relayhost: smtp.gmail.com
+      postfix_relaytls: true
+      postfix_smtp_tls_cafile: /etc/ssl/certs/ca-certificates.crt
+      postfix_sasl_user: "{{ smtp_smarthost_user }}"
+      postfix_sasl_password: "{{ smtp_smarthost_password }}"
+      postfix_smtpd_relay_restrictions:
+        - permit_mynetworks
+        - reject_unauth_destination
+
+    - role: geerlingguy.firewall
+
+    - role: oefenweb.fail2ban
+
+    - role: antoiner77.caddy
+      caddy_features: "http.jwt,http.login,tls.dns.cloudflare"
+      caddy_environment_variables:
+        CLOUDFLARE_EMAIL: "{{ email }}"
+        CLOUDFLARE_API_KEY: "{{ cloudflare_api_key }}"
+      caddy_config: "{{ lookup('template', 'files/caddy.conf.j2') }}"
+      caddy_systemd_capabilities_enabled: True
+
+    - role: cloudalchemy.node-exporter
+      node_exporter_enabled_collectors:
+        - diskstats:
+            ignored-devices: "^(ram|loop|fd)\\d+$"
+        - filesystem:
+            ignored-mount-points: "^/(dev|proc|run|sys)($|/)"
+            ignored-fs-types: "^(sys|proc|auto)fs$"
+        - interrupts
+        - meminfo_numa
+        - mountstats
+        - netstat:
+            fields: "(.*)"
+        - systemd
+        - tcpstat
+        - vmstat:
+            fields: "(.*)"
+
+    - role: cloudalchemy.alertmanager
+      alertmanager_external_url: "https://alertmanager.{{ my_name }}.{{ domain }}"
+      alertmanager_smtp:
+        from: "root@{{ ansible_fqdn }}"
+        smarthost: "localhost:25"
+        require_tls: "False"
+      alertmanager_receivers:
+        - name: email
+          email_configs:
+            - to: "{{ email }}"
+        - name: "null"
+      alertmanager_route:
+        group_by: ['alertname', 'cluster', 'service']
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        receiver: email
+      alertmanager_child_routes:
+        - match:
+            alertname: Watchdog
+          receiver: "null"
+
+    - role: cloudalchemy.prometheus
+      prometheus_web_external_url: "https://prometheus.{{ my_name }}.{{ domain }}"
+      prometheus_storage_retention: "31d"
+      prometheus_alertmanager_config:
+        - scheme: http
+          static_configs:
+            - targets:
+              - "localhost:9093"
+      prometheus_targets:
+        node:
+          - targets:
+            - localhost:9100
+            labels:
+              env: infra
+        alertmanager:
+          - targets:
+            - "localhost:9093"
+            labels:
+              env: infra
+        grafana:
+          - targets:
+            - "localhost:3000"
+            labels:
+              env: infra
+      prometheus_scrape_configs:
+        - job_name: "prometheus"
+          metrics_path: "/metrics"
+          static_configs:
+          - targets:
+            - "localhost:9090"
+        - job_name: "node"
+          file_sd_configs:
+          - files:
+            - "/etc/prometheus/file_sd/node.yml"
+        - job_name: "alertmanager"
+          file_sd_configs:
+          - files:
+            - "/etc/prometheus/file_sd/alertmanager.yml"
+        - job_name: "grafana"
+          file_sd_configs:
+          - files:
+            - "/etc/prometheus/file_sd/grafana.yml"
+
+    - role: cloudalchemy.grafana
+      grafana_security:
+        admin_user: admin
+        admin_password: "{{ grafana_password }}"
+      grafana_auth:
+        disable_login_form: true
+        anonymous:
+          org_name: "Main Org."
+          org_role: Admin
+      grafana_smtp:
+        host: 127.0.0.1
+      grafana_alert_notifications:
+        - name: "Email Alert"
+          type: "email"
+          isDefault: true
+          settings:
+            addresses: "{{ email }}"
+      grafana_datasources:
+        - name: "Prometheus"
+          type: "prometheus"
+          access: "proxy"
+          url: "http://127.0.0.1:9090"
+          isDefault: true
+      grafana_dashboards:
+        - dashboard_id: '1860'
+          revision_id: '12'
+          datasource: '{{ grafana_datasources.0.name }}'
+        - dashboard_id: '3662'
+          revision_id: '2'
+          datasource: '{{ grafana_datasources.0.name }}'
+        - dashboard_id: '9852'
+          revision_id: '1'
+          datasource: '{{ grafana_datasources.0.name }}'
+
+  tasks:
+    - import_tasks: tasks/configure_instances.yml

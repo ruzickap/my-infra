@@ -1,0 +1,9 @@
+- name: Deleting infrastructure using Terraform
+  terraform:
+    state: absent
+    project_path: terraform/{{ lookup('env','CLOUD_PLATFORM') }}
+  register: terraform_destroy_output
+
+- name: Terrafrom destroy output
+  debug:
+    var: terraform_destroy_output.stdout_lines

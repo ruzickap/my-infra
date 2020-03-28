@@ -1,0 +1,87 @@
+(disable_dotfiles) {
+  # Disables access to dotfiles for "browse"
+  status 403 /forbidden
+  rewrite {
+    r   /\.(.*)
+    to  /forbidden
+  }
+}
+
+(certificate) {
+  tls {{ email }} {% if letsencrypt_environment == 'staging' %}{
+    ca https://acme-staging-v02.api.letsencrypt.org/directory
+{% else %}
+
+{% endif %}
+    dns cloudflare
+    wildcard
+  }
+}
+
+# https://kamal.io/blog/securing-internal-services-behind-oauth2-with-caddy
+
+# openssl s_client -connect infra.xvx.cz:443 < /dev/null 2>/dev/null | openssl x509 -fingerprint -noout -in /dev/stdin
+# openssl s_client -connect infra01.xvx.cz:443 < /dev/null 2>/dev/null | openssl x509 -fingerprint -noout -in /dev/stdin
+# openssl s_client -connect auth.infra.xvx.cz:443 < /dev/null 2>/dev/null | openssl x509 -fingerprint -noout -in /dev/stdin
+# openssl s_client -connect grafana.infra.xvx.cz:443 < /dev/null 2>/dev/null | openssl x509 -fingerprint -noout -in /dev/stdin
+# https://crt.sh/
+# https://caddy.community/t/wildcard-domains-not-quite-working-as-expected/4666
+# https://caddyserver.com/v1/blog/caddy-0_10_12-released
+
+(int-auth) {
+  jwt {
+    path /
+    redirect https://auth.{{ my_name }}.{{ domain }}/login?backTo=https%3A%2F%2F{host}{rewrite_uri_escaped}
+    allow sub {{ email }}
+  }
+}
+
+http:// {
+  redir https://{host}{uri}
+}
+
+{{ my_name }}.{{ domain }} {
+  root /var/www/html
+  log stdout
+
+  tls {{ email }} {% if letsencrypt_environment == 'staging' %}{
+    ca https://acme-staging-v02.api.letsencrypt.org/directory
+{% else %}
+
+{% endif %}
+  }
+
+  import disable_dotfiles
+}
+
+auth.{{ my_name }}.{{ domain }} {
+  log stdout
+
+  redir 302 {
+    if {path} is /
+    / /login
+  }
+
+  login {
+    google client_id={{ google_oauth_client_id }},client_secret={{ google_oauth_client_secret }}
+    redirect_check_referer false
+    redirect_host_file /etc/caddy/redirect_hosts.txt
+    cookie_domain {{ my_name }}.{{ domain }}
+  }
+
+  import disable_dotfiles
+  import certificate
+}
+
+{% for web_service in web_services %}
+{{ web_service.service }}.{{ my_name }}.{{ domain }} {
+  log stdout
+  proxy / 127.0.0.1:{{ web_service.port }} {
+    transparent
+  }
+
+  import int-auth
+  import disable_dotfiles
+  import certificate
+}
+{% endfor %}
